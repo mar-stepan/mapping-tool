@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import type { GeoJSONFeature, GeoJSONFeatureCollection, SnackbarState } from '../interfaces';
-import type { ViewStateType } from "../types";
+import type { MapViewState } from "@deck.gl/core";
 
 export const useGeoJsonInitialization = (
     geoJsonData: GeoJSONFeatureCollection | null,
     calculateBoundingBox: (features: GeoJSONFeature[]) => number[] | null,
-    currentViewState: ViewStateType,
-    setViewState: (viewState: ViewStateType) => void,
+    currentViewState: MapViewState,
+    setViewState: (viewState: MapViewState) => void,
     setSnackbar: (snackbar: SnackbarState) => void
 ) => {
     const [processedDataId, setProcessedDataId] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export const useGeoJsonInitialization = (
 
         const bounds = calculateBoundingBox(geoJsonData.features);
         const timeoutId = setTimeout(() => {
-            let newViewState: ViewStateType;
+            let newViewState: MapViewState;
 
             if (bounds) {
                 const [minLng, minLat, maxLng, maxLat] = bounds;

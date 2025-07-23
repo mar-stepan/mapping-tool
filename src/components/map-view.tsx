@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Box, Button, ButtonGroup, Tooltip, Snackbar, Alert } from '@mui/material';
 import DeckGL from '@deck.gl/react';
-import { GeoJsonLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, type GeoJsonLayerProps } from '@deck.gl/layers';
 import { EditableGeoJsonLayer } from '@deck.gl-community/editable-layers';
 import { DrawPolygonMode, DrawLineStringMode, ModifyMode, ViewMode } from '@deck.gl-community/editable-layers';
 import { Map } from 'react-map-gl';
@@ -10,7 +10,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { saveAs } from 'file-saver';
 import StyleControls from './style-controls';
 import InfoPanel from './info-panel';
-import type { GeoJSONFeatureCollection, LocationData, SnackbarState, GeoJSONFeature } from "../shared/interfaces";
+import type { GeoJSONFeatureCollection, LocationData, SnackbarState } from "../shared/interfaces";
 import {
     useMapViewState,
     useBoundingBox,
@@ -19,6 +19,9 @@ import {
     useGeoJsonInitialization
 } from '../shared/hooks';
 import { MAP_CONFIG } from '../shared/constants';
+import type { Color, PickingInfo } from "@deck.gl/core";
+
+type AnyObject = Record<string, unknown>;
 
 type ColorArray = [number, number, number, number];
 type LayerStyle = {
@@ -26,20 +29,13 @@ type LayerStyle = {
     lineColor: ColorArray;
     lineWidth: number;
 };
-type ClickInfo = {
-    index: number;
-    object: unknown;
-    layer: unknown;
+type ClickInfo = Pick<PickingInfo, 'index' | 'object' | 'layer' | 'coordinate' | 'picked' | 'x' | 'y'> & {
     lngLat: [number, number];
-    coordinate: [number, number];
-    picked: boolean;
-    x: number;
-    y: number;
     srcEvent: {
         shiftKey: boolean;
     };
 };
-type MapLayer = GeoJsonLayer<unknown> | EditableGeoJsonLayer | null;
+type MapLayer = GeoJsonLayer<GeoJsonLayerProps<AnyObject>> | EditableGeoJsonLayer | null;
 
 interface MapViewProps {
     geoJsonData: GeoJSONFeatureCollection;
@@ -150,55 +146,58 @@ export const MapView = ({
     }, [selectedLocation, parseCoord]);
     const layers = useMemo(() => {
         const layerArray: MapLayer[] = [
-            new GeoJsonLayer({
+            new GeoJsonLayer<AnyObject>({
                 id: 'geojson-layer',
-                data: geoJsonData,
+                data: geoJsonData as unknown as GeoJSON.FeatureCollection,
                 pickable: true,
                 stroked: true,
                 filled: true,
                 extruded: true,
                 lineWidthScale: 20,
                 lineWidthMinPixels: 2,
-                getFillColor: (_: GeoJSONFeature, { index }: { index: number }) => {
-                    // Check if this feature is selected
+                getFillColor: (object): [number, number, number, number] => {
+                    const index = object?.properties?.__index as number;
                     const isSelected = selectedFeatureIndices.includes(index);
-                    return isSelected ? MAP_CONFIG.COLORS.SELECTED.FILL : MAP_CONFIG.COLORS.DEFAULT.FILL;
+                    return (isSelected ? MAP_CONFIG.COLORS.SELECTED.FILL : MAP_CONFIG.COLORS.DEFAULT.FILL) as [number, number, number, number];
                 },
-                getLineColor: (_: GeoJSONFeature, { index }: { index: number }) => {
+                getLineColor: (object): [number, number, number, number] => {
+                    const index = object?.properties?.__index as number;
                     const isSelected = selectedFeatureIndices.includes(index);
-                    return isSelected ? MAP_CONFIG.COLORS.SELECTED.LINE : MAP_CONFIG.COLORS.DEFAULT.LINE;
+                    return (isSelected ? MAP_CONFIG.COLORS.SELECTED.LINE : MAP_CONFIG.COLORS.DEFAULT.LINE) as [number, number, number, number];
                 },
-                getPointRadius: (d: GeoJSONFeature) => d.properties?.radius || 100,
-                getLineWidth: (d: GeoJSONFeature, { index }: { index: number }) => {
+                getPointRadius: (d): number => (d?.properties?.radius || 100) as number,
+                getLineWidth: (d): number => {
+                    const index = d?.properties?.__index as number;
                     const isSelected = selectedFeatureIndices.includes(index);
-                    return isSelected ? MAP_CONFIG.LINE_WIDTH.SELECTED : (d.properties?.lineWidth || MAP_CONFIG.LINE_WIDTH.DEFAULT);
+                    return isSelected ? MAP_CONFIG.LINE_WIDTH.SELECTED : (d?.properties?.lineWidth || MAP_CONFIG.LINE_WIDTH.DEFAULT) as number;
                 },
-                getElevation: (d: GeoJSONFeature, { index }: { index: number }) => {
+                getElevation: (d): number => {
+                    const index = d?.properties?.__index as number;
                     const isSelected = selectedFeatureIndices.includes(index);
-                    return isSelected ? 60 : (d.properties?.elevation || 30);
+                    return isSelected ? 60 : (d?.properties?.elevation || 30) as number;
                 },
                 pointRadiusMinPixels: MAP_CONFIG.POINT_RADIUS.MIN,
                 pointRadiusMaxPixels: MAP_CONFIG.POINT_RADIUS.MAX,
                 autoHighlight: true,
-                highlightColor: MAP_CONFIG.COLORS.HIGHLIGHT,
-                onClick: handleFeatureClick
+                highlightColor: MAP_CONFIG.COLORS.HIGHLIGHT as unknown as number[],
+                onClick: handleFeatureClick as unknown as () => void
             }),
-            boundaryGeoJson ? new GeoJsonLayer({
+            boundaryGeoJson ? new GeoJsonLayer<AnyObject>({
                 id: 'boundary-layer',
-                data: boundaryGeoJson,
+                data: boundaryGeoJson as unknown as GeoJSON.FeatureCollection,
                 pickable: true,
                 stroked: true,
                 filled: false,
                 lineWidthScale: 20,
                 lineWidthMinPixels: 2,
-                getLineColor: MAP_CONFIG.COLORS.BOUNDARY,
+                getLineColor: MAP_CONFIG.COLORS.BOUNDARY as unknown as Color,
                 getLineWidth: MAP_CONFIG.LINE_WIDTH.DEFAULT + 1
             }) : null,
             new EditableGeoJsonLayer({
                 id: 'editable-geojson-layer',
                 data: {
                     type: 'FeatureCollection',
-                    features: [...editableFeatures.features]
+                    features: [...editableFeatures.features] as any[]
                 },
                 mode,
                 selectedFeatureIndexes: selectedEditableIndex !== null ? [selectedEditableIndex] : [],
@@ -207,20 +206,19 @@ export const MapView = ({
                 autoHighlight: true,
                 pointRadiusScale: 2000,
                 pointRadiusMinPixels: MAP_CONFIG.POINT_RADIUS.MIN,
-                getPointRadius: 0.5,
                 getFillColor: layerStyle.fillColor,
                 getLineColor: layerStyle.lineColor,
                 getLineWidth: layerStyle.lineWidth,
                 editHandlePointRadiusScale: 2000,
                 editHandlePointRadiusMinPixels: 6,
-                getEditHandlePointColor: (h: { type: string }) => [
+                getEditHandlePointColor: (h: { type: string }): [number, number, number, number] => [
                     255,
                     h.type === 'existing' ? 140 : 200,
                     h.type === 'existing' ? 0 : 0,
                     255
                 ],
             }),
-            selectedLocation ? new GeoJsonLayer({
+            selectedLocation ? new GeoJsonLayer<AnyObject>({
                 id: 'selected-location',
                 data: {
                     type: 'Feature' as const,
@@ -230,16 +228,17 @@ export const MapView = ({
                             parseCoord(selectedLocation.lon),
                             parseCoord(selectedLocation.lat)
                         ]
-                    }
-                } as GeoJSONFeature,
+                    },
+                    properties: {}
+                },
                 pickable: true,
                 stroked: true,
                 filled: true,
                 pointRadiusScale: 1,
                 pointRadiusMinPixels: 6,
                 getPointRadius: 5,
-                getFillColor: MAP_CONFIG.COLORS.LOCATION.FILL,
-                getLineColor: MAP_CONFIG.COLORS.LOCATION.LINE,
+                getFillColor: MAP_CONFIG.COLORS.LOCATION.FILL as unknown as Color,
+                getLineColor: MAP_CONFIG.COLORS.LOCATION.LINE as unknown as Color,
                 getLineWidth: MAP_CONFIG.LINE_WIDTH.DEFAULT
             }) : null
         ];
@@ -261,7 +260,7 @@ export const MapView = ({
         <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
             <DeckGL
                 viewState={viewState}
-                onViewStateChange={handleViewStateChange}
+                onViewStateChange={handleViewStateChange as any}
                 controller={true}
                 layers={layers}
                 getCursor={({ isDragging }: {
@@ -269,7 +268,7 @@ export const MapView = ({
                 }) => isDragging ? 'grabbing' : mode === ViewMode ? 'default' : 'crosshair'}
             >
                 <Map
-                    mapLib={maplibregl as never}
+                    mapLib={maplibregl as any}
                     mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
                     reuseMaps
                 />

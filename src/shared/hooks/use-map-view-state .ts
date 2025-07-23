@@ -1,9 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { FlyToInterpolator } from '@deck.gl/core';
+import { FlyToInterpolator, type MapViewState } from '@deck.gl/core';
 import type { LocationData } from '../interfaces';
-import type { ViewStateType } from "../types";
-
-
 
 const MAP_CONFIG = {
     TRANSITION_DURATION: 1000,
@@ -13,7 +10,7 @@ const MAP_CONFIG = {
     TOLERANCE: 0.0001,
 } as const;
 
-const INITIAL_VIEW_STATE: ViewStateType = {
+const INITIAL_VIEW_STATE: MapViewState = {
     longitude: 0,
     latitude: 0,
     zoom: MAP_CONFIG.WORLD_ZOOM,
@@ -22,7 +19,7 @@ const INITIAL_VIEW_STATE: ViewStateType = {
 };
 
 export const useMapViewState = (selectedLocation: LocationData | null) => {
-    const [viewState, setViewState] = useState<ViewStateType>(INITIAL_VIEW_STATE);
+    const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
 
     const parseCoord = useCallback((value: string | number): number => {
         const parsed = typeof value === 'string' ? parseFloat(value) : value;
@@ -86,7 +83,7 @@ export const useMapViewState = (selectedLocation: LocationData | null) => {
         }
     }, [selectedLocation, calculateZoomFromBounds, parseCoord]);
 
-    const handleViewStateChange = useCallback((params: { viewState: ViewStateType }) => {
+    const handleViewStateChange = useCallback((params: { viewState: MapViewState }) => {
         setViewState(params.viewState);
     }, []);
 
