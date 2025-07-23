@@ -3,7 +3,7 @@
 A React TypeScript application for visualizing and editing geographic data using interactive maps with drawing capabilities.
 
 ## Demo
-Navigate to `https://mar-stepan.github.io/mapping-tool/`
+Navigate to [https://mar-stepan.github.io/mapping-tool/](https://mar-stepan.github.io/mapping-tool/)
 
 ## Features
 
